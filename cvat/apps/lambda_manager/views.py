@@ -147,8 +147,10 @@ class LambdaFunction:
                 mapping = {k:v for k,v in mapping.items() if v in mapping_by_default}
 
             if self.kind == LambdaType.DETECTOR:
+                image, image_path = self._get_image_and_path(db_task, data["frame"], quality)
                 payload.update({
-                    "image": self._get_image(db_task, data["frame"], quality)
+                    "image": image,
+                    "image_path":image_path
                 })
             elif self.kind == LambdaType.INTERACTOR:
                 payload.update({
@@ -208,6 +210,25 @@ class LambdaFunction:
         image = frame_provider.get_frame(frame, quality=quality)
 
         return base64.b64encode(image[0].getvalue()).decode('utf-8')
+    
+    def _get_image_and_path(self, db_task, frame, quality):
+        if quality is None or quality == "original":
+            quality = FrameProvider.Quality.ORIGINAL
+        elif  quality == "compressed":
+            quality = FrameProvider.Quality.COMPRESSED
+        else:
+            raise ValidationError(
+                '`{}` lambda function was run '.format(self.id) +
+                'with wrong arguments (quality={})'.format(quality),
+                code=status.HTTP_400_BAD_REQUEST)
+
+        frame_provider = FrameProvider(db_task.data)
+        image = frame_provider.get_frame(frame, quality=quality)
+
+        media = list(db_task.data.images.order_by('frame'))
+        img_path = media[frame].path
+
+        return base64.b64encode(image[0].getvalue()).decode('utf-8'),img_path
 
 
 class LambdaQueue:
