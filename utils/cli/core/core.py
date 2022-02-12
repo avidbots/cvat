@@ -72,6 +72,31 @@ class CLI():
             response.raise_for_status()
         return output
 
+    def projects_list(self, use_json_output, **kwargs):
+        """ List all tasks in either basic or JSON format. """
+        url = self.api.projects
+        response = self.session.get(url)
+        response.raise_for_status()
+        output = []
+        page = 1
+        json_data_list = []
+        while True:
+            response_json = response.json()
+            output += response_json['results']
+            for r in response_json['results']:
+                if use_json_output:
+                    json_data_list.append(r)
+                else:
+                    log.info('{id},{name},{status}'.format(**r))
+            if not response_json['next']:
+                log.info(json.dumps(json_data_list, indent=4))
+                return output
+            page += 1
+            url = self.api.tasks_page(page)
+            response = self.session.get(url)
+            response.raise_for_status()
+        return output
+
     def tasks_create(self, name, labels, resource_type, resources,
                      annotation_path='', annotation_format='CVAT XML 1.1',
                      completion_verification_period=20,
@@ -286,8 +311,15 @@ class CVAT_API_V1():
     def tasks(self):
         return self.base + 'tasks'
 
+    @property
+    def projects(self):
+        return self.base + 'projects'
+
     def tasks_page(self, page_id):
         return self.tasks + '?page={}'.format(page_id)
+
+    def projects_page(self, page_id):
+        return self.projects + '?page={}'.format(page_id)
 
     def tasks_id(self, task_id):
         return self.tasks + '/{}'.format(task_id)
